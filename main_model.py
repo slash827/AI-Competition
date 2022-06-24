@@ -1,4 +1,5 @@
 import time
+import os
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -11,6 +12,7 @@ from keras.layers import Convolution2D, MaxPooling2D
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Conv2D, MaxPool2D, Flatten, ZeroPadding2D
 from keras.utils import np_utils
+
 
 
 def bens_model(X_train, y_train, X_test, y_test):
@@ -127,7 +129,11 @@ def train_model(model, X_train, y_train, X_test, y_test):
         patience=8,
         mode='auto',
     )
+
+    if not os.path.exists("saved_models"):
+        os.mkdir("saved_models")
     cache = "saved_models/best_conf.ckpt"
+
     checkpoint = ModelCheckpoint(cache,
                                  monitor='val_accuracy',
                                  verbose=True,
@@ -135,7 +141,7 @@ def train_model(model, X_train, y_train, X_test, y_test):
                                  save_weights_only=True,
                                  mode='max')
 
-    history = model.fit(X_train, y_train, batch_size=8,
+    history = model.fit(X_train, y_train, batch_size=16,
                         epochs=50,
                         callbacks=[checkpoint, early_stop],
                         validation_data=(X_test, y_test),
