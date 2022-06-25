@@ -9,6 +9,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_datasets as tfds
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.datasets import cifar10
 from sklearn.metrics import classification_report, confusion_matrix
 from keras.utils import np_utils
@@ -93,11 +94,29 @@ def load_cifar():
 
 
 def train_model(model, X_train, y_train, X_test, y_test):
+    early_stop = EarlyStopping(
+        monitor='val_accuracy',
+        patience=8,
+        mode='auto',
+    )
+
+    if not os.path.exists("saved_models"):
+        os.mkdir("saved_models")
+    cache = "saved_models/best_dicriminator.ckpt"
+
+    checkpoint = ModelCheckpoint(cache,
+                                 monitor='val_accuracy',
+                                 verbose=True,
+                                 save_best_only=True,
+                                 save_weights_only=True,
+                                 mode='max')
+
     history = model.fit(X_train, y_train, batch_size=16,
                         epochs=50,
+                        callbacks=[checkpoint, early_stop],
                         validation_data=(X_test, y_test),
                         verbose=True)
-
+    model.load_weights("saved_models/best_dicriminator.ckpt")
     return model, history
 
 
