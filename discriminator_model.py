@@ -157,43 +157,40 @@ def create_discrimination_dataset(X_train, Y_train, X_test, Y_test):
     New_Train_Data_l = []
     New_Train_Label = []
 
-    New_Test_Data_i = []
-    New_Test_Data_l = []
-    New_Test_Label = []
-
     noise_file = load_noisy_dataset()
 
     for i, data in enumerate(X_train):
         img_data = X_train[i]
         x = tf.stack(img_data)
-        y_clean = list(Y_train[i]).index(1)
-        New_Train_Label.append(1)
-        New_Train_Data_i.append(x)
-        New_Train_Data_l.append(y_clean)
-        for noise in ['clean_label', 'worse_label', 'aggre_label', 'random_label1', 'random_label2', 'random_label3']:
+        y_clean = noise_file.item().get('clean_label')[i]#     y_clean = list(Y_train[i]).index(1)
+        # New_Train_Label.append(1)
+        # New_Train_Data_i.append(x)
+        # New_Train_Data_l.append(y_clean)
+        past_noises = []
+        for noise in ['worse_label', 'aggre_label', 'random_label1', 'random_label2', 'random_label3']:
             noise_label = noise_file.item().get(noise)[i]
-            if y_clean != noise_label:
+            if y_clean != noise_label and noise_label not in past_noises:
                 x = tf.stack(img_data)
                 y = noise_label
+                # balance with-:
                 New_Train_Label.append(0)
+                New_Train_Data_i.append(x_org)
+                New_Train_Data_l.append(y_clean)
+                past_noises.append(noise_label)
+                New_Train_Label.append(1)
                 New_Train_Data_i.append(x)
                 New_Train_Data_l.append(y)
 
-    for i, data in enumerate(X_test):
-        img_data = X_test[i]
-        x = tf.stack(img_data)
-        y_clean = list(Y_test[i]).index(1)
-        New_Test_Label.append(1)
-        New_Test_Data_i.append(x)
-        New_Test_Data_l.append(y_clean)
-        for noise in ['clean_label', 'worse_label', 'aggre_label', 'random_label1', 'random_label2', 'random_label3']:
-            noise_label = noise_file.item().get(noise)[i]
-            if y_clean != noise_label:
-                x = tf.stack(img_data)
-                y = noise_label
-                New_Test_Label.append(0)
-                New_Test_Data_i.append(x)
-                New_Test_Data_l.append(y)
+    print("Balance of labels : ", sum(New_Train_Label) / len(New_Train_Label))
+    TEST_SIZE = int(len(New_Train_Label) / 10)
+    print("TEST_SIZE: ", TEST_SIZE)
+    New_Train_Data_i = New_Train_Data_i[0:len(New_Train_Data_i) - TEST_SIZE]
+    New_Train_Data_l = New_Train_Data_l[0:len(New_Train_Data_l) - TEST_SIZE]
+    New_Train_Label = New_Train_Label[0:len(New_Train_Label) - TEST_SIZE]
+
+    New_Test_Data_i = New_Train_Data_i[(len(New_Train_Data_i) - TEST_SIZE):]
+    New_Test_Data_l = New_Train_Data_l[(len(New_Train_Data_l) - TEST_SIZE):]
+    New_Test_Label = New_Train_Label[(len(New_Train_Label) - TEST_SIZE):]
 
     x_TrI = np.stack(New_Train_Data_i)
     x_TrI = np.array(x_TrI)
