@@ -161,7 +161,7 @@ def create_discrimination_dataset(X_train, Y_train, X_test, Y_test):
 
     for i, data in enumerate(X_train):
         img_data = X_train[i]
-        x = tf.stack(img_data)
+        x_org = tf.stack(img_data)
         y_clean = noise_file.item().get('clean_label')[i]#     y_clean = list(Y_train[i]).index(1)
         # New_Train_Label.append(1)
         # New_Train_Data_i.append(x)
