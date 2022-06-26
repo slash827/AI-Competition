@@ -14,6 +14,9 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.datasets import cifar10
 from sklearn.metrics import classification_report, confusion_matrix
 from keras.utils import np_utils
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, plot_roc_curve
+from keras.models import load_model
+from pickle import dump, load
 
 def tag_train_images_by_cnn(cnn, train_set):
     proba_preds_cnn = [cnn.predict(img.reshape(1, img.shape[0], img.shape[1], img.shape[2])) for img in train_set]
@@ -22,6 +25,45 @@ def tag_train_images_by_cnn(cnn, train_set):
         pickle.dump(proba_preds_cnn, handle)
     with open('cnn_final_labels.pickle', 'wb') as handle:
         pickle.dump(final_labels_cnn, handle)
+
+def test_on_new_images(X_test, Y_test):
+    discriminator = load_model('discriminator_org_best_using_cnn_classification.h5')
+    Y_test = [list(p).index(max(p)) for p in Y_test]
+
+    test_Data_i = []
+    test_Data_l = []
+    test_Label = []
+
+    for i, data in enumerate(X_test):
+        x_org = tf.stack(data)
+        y_clean = Y_test[i]
+        test_Data_i.append(x_org)
+        test_Data_l.append(y_clean)
+        test_Label.append(0)
+        for noise_l in range(0, 10):
+            if noise_l != y_clean:
+                test_Label.append(1)
+                test_Data_i.append(x_org)
+                test_Data_l.append(noise_l)
+
+    test_Data_i = np.stack(test_Data_i)
+    test_Data_i = np.array(test_Data_i)
+
+    test_Data_l = np.stack(test_Data_l).reshape(len(test_Data_l), 1)
+    test_Data_l = np.array(test_Data_l)
+    test_Label = np.array(test_Label)
+
+    new_preds = discriminator.predict([test_Data_i, test_Data_l])
+    new_preds = [o[0] for o in new_preds]
+    new_preds = [1 if i > 0.5 else 0 for i in new_preds]
+
+    labels = [0, 1]
+    cm = confusion_matrix(list(test_Label), new_preds, labels=labels)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot()
+
+    target_names = ['good label', 'Outlier!']
+    print(classification_report(test_Label, new_preds, target_names=target_names))
 
 def discriminator_model():
     # building a linear stack of layers with the sequential model
