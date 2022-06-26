@@ -4,6 +4,7 @@ from keras.models import Model
 from keras.layers import Dense, Dropout, BatchNormalization, Conv2D, MaxPool2D, Flatten, Input
 import time
 import os
+import pickle
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -13,6 +14,14 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.datasets import cifar10
 from sklearn.metrics import classification_report, confusion_matrix
 from keras.utils import np_utils
+
+def tag_train_images_by_cnn(cnn, train_set):
+    proba_preds_cnn = [cnn.predict(img.reshape(1, img.shape[0], img.shape[1], img.shape[2])) for img in train_set]
+    final_labels_cnn = [list(pred[0]).index(max(pred[0])) for pred in proba_preds_cnn]
+    with open('cnn_predictions.pickle', 'wb') as handle:
+        pickle.dump(proba_preds_cnn, handle)
+    with open('cnn_final_labels.pickle', 'wb') as handle:
+        pickle.dump(final_labels_cnn, handle)
 
 def discriminator_model():
     # building a linear stack of layers with the sequential model
@@ -157,10 +166,13 @@ def create_discrimination_dataset(X_train, Y_train, X_test, Y_test):
 
     noise_file = load_noisy_dataset()
 
+    with open('cnn_final_labels.pickle', 'rb') as handle:
+        cnn_labels = pickle.load(handle)
+
     for i, data in enumerate(X_train):
         img_data = X_train[i]
         x_org = tf.stack(img_data)
-        y_clean = noise_file.item().get('clean_label')[i]#     y_clean = list(Y_train[i]).index(1)
+        y_clean = cnn_labels[i] # noise_file.item().get('clean_label')[i]#     y_clean = list(Y_train[i]).index(1)
         # New_Train_Label.append(1)
         # New_Train_Data_i.append(x)
         # New_Train_Data_l.append(y_clean)
