@@ -5,22 +5,18 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import tensorflow_datasets as tfds
 from keras.datasets import cifar10
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import Convolution2D, MaxPooling2D
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPool2D, Flatten, ZeroPadding2D, Input
 from tensorflow.keras.utils import to_categorical
 from keras.models import Sequential
 from keras.layers import concatenate
 from keras.models import Model
-from keras.layers import Dense, Dropout, BatchNormalization, Conv2D, MaxPool2D, Flatten, Input
-import time
+from keras.layers import Dense, Dropout, Conv2D, MaxPool2D, Flatten, Input
 import pickle
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, plot_roc_curve
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 from tensorflow.keras.models import load_model
-from pickle import dump, load
 
 
 def tag_train_images_by_cnn(cnn, train_set):
@@ -153,7 +149,7 @@ def load_cifar():
 def train_model(model, X_train, y_train, X_test, y_test):
     early_stop = EarlyStopping(
         monitor='val_accuracy',
-        patience=6,
+        patience=8,
         mode='auto',
     )
 
@@ -168,9 +164,8 @@ def train_model(model, X_train, y_train, X_test, y_test):
                                  save_weights_only=True,
                                  mode='max')
 
-    model.load_weights("saved_models/best_conf.ckpt")
     history = model.fit(X_train, y_train, batch_size=16,
-                        epochs=1,
+                        epochs=30,
                         callbacks=[checkpoint, early_stop],
                         validation_data=(X_test, y_test),
                         verbose=True)
@@ -300,11 +295,14 @@ def extracted_flattened_features():
 
 """make predictions"""
 y_predicted = model.predict(X_test)
-y_predicted = [1 if item > 0.5 else 0 for item in y_predicted]
+y_predicted = [True if item > 0.5 else False for item in y_predicted]
 
 print(classification_report(y_test, y_predicted))
 conf_mat = confusion_matrix(y_test, y_predicted)
 plot_conf_mat(conf_mat)
+
+y_predicted = np.array(y_predicted, dtype="bool")
+np.save('detection.npy', y_predicted)
 
 """#Clustering"""
 
@@ -340,56 +338,54 @@ import cv2
 
 
 def create_augmentation(X_train):
-    vflip_train = []
     rot_train = []
-    for img in X_train:
-        vertical_flip = cv2.flip(img, 0)
-        vflip_train.append(vertical_flip)
+    for i, img in enumerate(X_train):
         rotate_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
         rot_train.append(rotate_90)
 
-    vflip_train = np.array(vflip_train, dtype="float16")
     rot_train = np.array(rot_train, dtype="float16")
-    return vflip_train, rot_train
+    return rot_train
 
-
-vflip_train, rot_train = create_augmentation(X_train)
-X_train = np.array(X_train, dtype="float16")
 
 y_train = y_train.reshape(-1)
 y_train = y_train.tolist()
-y_train = y_train + y_train + y_train
+y_train = y_train + y_train
 y_train = np.array(y_train, dtype="int16")
 
-X_train = np.vstack((X_train, rot_train,))
+x_TrI, x_TrL = X_train
+rot_train = create_augmentation(x_TrI)
 
-X_train = np.vstack((X_train, vflip_train))
+x_TrI = np.array(x_TrI, dtype="float16")
+x_TrI = np.vstack((x_TrI, rot_train))
+
+x_TrL = x_TrL.reshape(-1)
+x_TrL = x_TrL.tolist()
+x_TrL = x_TrL + x_TrL
+x_TrL = np.array(x_TrL, dtype="int16")
+
+X_train = [x_TrI, x_TrL]
 
 
-def adjust_dataset_to_CNN(x_train, x_test, y_train, y_test):
+def adjust_dataset_to_CNN(y_train, y_test):
     y_train = np.array(y_train, dtype="int64")
-    print(y_train)
     y_train = to_categorical(y_train, num_classes=10)
 
     y_test = np.array(y_test, dtype="int64")
     y_test = to_categorical(y_test, num_classes=10)
-
-    x_train = np.array(x_train)
-    x_test = np.array(x_test)
-
-    x_train = x_train.reshape(x_train.shape + (1,))
-    x_test = x_test.reshape(x_test.shape + (1,))
-
-    return x_train, x_test, y_train, y_test
+    return y_train, y_test
 
 
-X_train, X_test, y_train, y_test = adjust_dataset_to_CNN(X_train, X_test, y_train, y_test)
+def train_with_augmented(discriminator, X_train, y_train, X_test, y_test):
+    y_train, y_test = adjust_dataset_to_CNN(y_train, y_test)
 
-model, history = train_model(discriminator, X_train, y_train, X_test, y_test)
+    model, history = train_model(discriminator, X_train, y_train, X_test, y_test)
 
-y_predicted = model.predict(X_test)
-y_predicted = [1 if item > 0.5 else 0 for item in y_predicted]
+    y_predicted = model.predict(X_test)
+    y_predicted = [True if item > 0.5 else False for item in y_predicted]
 
-print(classification_report(y_test, y_predicted))
-conf_mat = confusion_matrix(y_test, y_predicted)
-plot_conf_mat(conf_mat)
+    print(classification_report(y_test, y_predicted))
+    conf_mat = confusion_matrix(y_test, y_predicted)
+    plot_conf_mat(conf_mat)
+
+    y_predicted = np.array(y_predicted, dtype="bool")
+    np.save('detection.npy', y_predicted)
